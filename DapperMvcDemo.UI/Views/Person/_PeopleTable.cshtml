@@ -1,0 +1,15 @@
+﻿@model IEnumerable<Person>
+
+@foreach (var person in Model)
+{
+    <tr>
+        <td>@person.Name</td>
+        <td>@person.Email</td>
+        <td>@person.Address</td>
+        <td>@person.DepartmentName</td>
+        <td>
+            <a href="/Person/Edit?id=@person.Id" class="btn btn-success">Edit</a>
+            <a href="/Person/Delete?id=@person.Id" onclick="return confirm('Are you sure you want to delete this record?');" class="btn btn-danger">Delete</a>
+        </td>
+    </tr>
+}

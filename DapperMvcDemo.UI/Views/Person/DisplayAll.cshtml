@@ -1,0 +1,139 @@
+﻿@{
+    ViewData["Title"] = "People List";
+}
+
+<h1>People List</h1>
+
+<div class="d-flex justify-content-between mb-3">
+    <input type="text" id="searchBox" class="form-control w-25" placeholder="Search persons..." />
+</div>
+
+<div class="my-2 d-flex gap-2">
+    <a href="/Person/Add" class="btn btn-info">Add Person</a>
+    <button id="printBtn" class="btn btn-secondary">Print PDF</button>
+</div>
+
+<div id="printArea">
+    <div class="text-center mb-4">
+        <img src="/images/logo.png" id="pdfLogo" style="max-height: 80px;" alt="Logo" />
+        <h2 class="mt-2">People Report</h2>
+    </div>
+
+    <table class="table table-striped" id="personTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Address</th>
+                <th>Department</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="personTableBody">
+            <!-- AJAX content -->
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            function loadPersons(departmentId = "") {
+                $.ajax({
+                    url: "/Person/GetPersons",
+                    type: "GET",
+                    data: { departmentId: departmentId },
+                    dataType: "json",
+                    success: function (data) {
+                        let tableBody = $("#personTableBody");
+                        tableBody.empty();
+
+                        if (data.length === 0) {
+                            tableBody.append("<tr><td colspan='5' class='text-center'>No persons found.</td></tr>");
+                            return;
+                        }
+
+                        data.sort((a, b) => a.name.localeCompare(b.name));
+
+                        $.each(data, function (index, person) {
+                            tableBody.append(`
+                                <tr>
+                                    <td>${person.name}</td>
+                                    <td>${person.email}</td>
+                                    <td>${person.address}</td>
+                                    <td>${person.departmentName}</td>
+                                    <td>
+                                        <a href="/Person/Edit?id=${person.id}" class="btn btn-success btn-sm me-1">Edit</a>
+                                        <a href="/Person/Delete?id=${person.id}" onclick="return confirm('Are you sure?')" class="btn btn-danger btn-sm">Delete</a>
+                                    </td>
+                                </tr>
+                            `);
+                        });
+                    },
+                    error: function () {
+                        alert("Error loading persons.");
+                    }
+                });
+            }
+
+            loadPersons();
+
+            $("#searchBox").on("input", function () {
+                let searchTerm = $(this).val().toLowerCase();
+                $("#personTableBody tr").each(function () {
+                    let rowText = $(this).text().toLowerCase();
+                    $(this).toggle(rowText.includes(searchTerm));
+                });
+            });
+
+            $("#printBtn").click(function () {
+                let element = document.getElementById("printArea");
+                let clone = element.cloneNode(true);
+
+                // Remove Actions column
+                $(clone).find("th:last-child, td:last-child").remove();
+
+                // Add custom timestamp, signature line, and total records
+                let now = new Date();
+                let dateStr = now.toLocaleDateString();
+                let timeStr = now.toLocaleTimeString();
+                let totalRecords = $("#personTableBody tr").length;
+
+                let footer = document.createElement("div");
+                footer.innerHTML = `
+                    <hr />
+                    <p><strong>Printed on:</strong> ${dateStr} at ${timeStr}</p>
+                    <p><strong>Total Records:</strong> ${totalRecords}</p>
+                    <p><strong>Signature:</strong> ____________________________</p>
+                    <div style="text-align: center; position: fixed; bottom: 10px; width: 100%;">
+                        <p>For inquiries, contact us at: <strong>contact@yourcompany.com</strong></p>
+                    </div>
+                `;
+                clone.appendChild(footer);
+
+                let opt = {
+                    margin:       0.5,
+                    filename:     'PeopleList.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+                    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                html2pdf().from(clone).set(opt).toPdf().get('pdf').then(function (pdf) {
+                    let totalPages = pdf.internal.getNumberOfPages();
+
+                    for (let i = 1; i <= totalPages; i++) {
+                        pdf.setPage(i);
+                        pdf.setFontSize(10);
+                        pdf.text('Page ' + i + ' of ' + totalPages, pdf.internal.pageSize.getWidth() - 60, pdf.internal.pageSize.getHeight() - 10);
+                    }
+                }).save();
+            });
+        });
+    </script>
+}
